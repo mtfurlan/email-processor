@@ -1,3 +1,5 @@
 python-dotenv
 ipdb
 imapclient
+ruff
+pre-commit

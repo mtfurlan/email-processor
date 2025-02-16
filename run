@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1
+
+
+# shellcheck disable=SC2120
+h () {
+    # if arguments, print them
+    [ $# == 0 ] || echo "$*"
+
+  cat <<EOF
+Usage: $(basename "${BASH_SOURCE[0]}") [OPTION]...
+run python stuff
+  -h, --help       display this help and exit
+      --check      run linters in check mode
+  -f, --fix        run formatters
+EOF
+
+    # if args, exit 1 else exit 0
+    [ $# == 0 ] || exit 1
+    exit 0
+}
+msg() {
+    echo >&2 -e "${*-}"
+}
+
+die() {
+    local msg=$1
+    local code=${2-1} # default exit status 1
+    msg "$msg"
+    exit "$code"
+}
+
+# getopt short options go together, long options have commas
+TEMP=$(getopt -o hf --long help,fix,check -n "$0" -- "$@")
+#shellcheck disable=SC2181
+if [ $? != 0 ] ; then
+    die "something wrong with getopt"
+fi
+eval set -- "$TEMP"
+
+check=false
+fix=false
+while true ; do
+    case "$1" in
+        -h|--help) h ;;
+        --check) check=true; shift ;;
+        -f|--fix) fix=true; shift ;;
+        --) shift ; break ;;
+        *) die "issue parsing args, unexpected argument '$1'!" ;;
+    esac
+done
+
+if [ "$check" = true ]; then
+    .venv/bin/ruff check .
+    .venv/bin/ruff format --check .
+    exit 0
+fi
+if [ "$fix" = true ]; then
+    .venv/bin/ruff check --fix .
+    .venv/bin/ruff format .
+    exit 0
+fi
+
+
+if ! [[ -d .venv ]]; then
+    python3 -m venv .venv
+    .venv/bin/pip install -r requirements.txt
+fi
+.venv/bin/python runner.py
