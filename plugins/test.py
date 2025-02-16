@@ -5,4 +5,5 @@ class Plugin:
     senders = ["bingo@patreon.com"]
 
     def handle(self, msg: email.message.EmailMessage) -> bool:
+        print("HI we process but fail")
         return False

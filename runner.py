@@ -9,6 +9,7 @@ from imapclient import IMAPClient
 import importlib.util
 from EmailProcessorProtocol import EmailProcessorProtocol
 import glob
+import re
 
 load_dotenv()
 
@@ -37,7 +38,9 @@ server = IMAPClient("imap.gmail.com", use_uid=True)
 
 server.login(os.getenv("USERNAME"), os.getenv("PASSWORD"))
 select_info = server.select_folder("INBOX")
-print("%d messages in INBOX" % select_info[b"EXISTS"])
+
+
+print(f"processing {select_info[b'EXISTS']} messages from INBOX")
 
 messages = server.search()
 for uid in messages:
@@ -45,17 +48,29 @@ for uid in messages:
     msg = email.message_from_bytes(msg_data, policy=email.policy.default)
     simplest = msg.get_body(preferencelist=("plain", "html"))
     content = simplest.get_content()
-    print(uid, msg.get("From"), msg.get("Subject"))
+    print(f'processing msg[{uid}]: "{msg.get("From")}": "{msg.get("Subject")}"')
+
+    # sender might be something like '"Victoria Scott (via Patreon)" <bingo@patreon.com>'
+    # we want to filter on the email portion
+    msg.senderRaw = re.findall(r'^(?:".*" )?<?(.*?)>?$', (msg.get("X-Google-Original-From") or msg.get("From")))[0]
+    #import ipdb; ipdb.set_trace()
 
     handled = False
-    for p in plugins:
-        if (msg.get("X-Google-Original-From") or msg.get("From")) in p.senders:
-            handled = p.handle(msg)
-            if handled:
-                break
-    if handled:
+
+
+    # TODO: move canHandle into plugin thingy and change it to ABC or whatever
+    def canHandle(p, msg) -> bool:
+        return msg.senderRaw in p.senders
+
+    #results = plugins.filter(p => canHandle(p, msg)
+    #                 .map(p -> p.handle(msg);
+    results = list(map(lambda p: p.handle(msg), [p for p in plugins if canHandle(p, msg)]))
+    if all(results):
         # archive
-        server.delete_messages([uid])
+        print("ARCHIVE???")
+        # server.delete_messages([uid])
+    else:
+        print("some plugin failed to process")
 
     # import ipdb; ipdb.set_trace()
 server.logout()
