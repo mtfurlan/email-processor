@@ -1,7 +1,9 @@
 import email
 
+from PluginABC import PluginABC
 
-class Plugin:
+
+class Plugin(PluginABC):
     senders = ["bingo@patreon.com"]
 
     def handle(self, msg: email.message.EmailMessage) -> bool:

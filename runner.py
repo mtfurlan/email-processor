@@ -7,7 +7,7 @@ import email.policy
 from dotenv import load_dotenv
 from imapclient import IMAPClient
 import importlib.util
-from EmailProcessorProtocol import EmailProcessorProtocol
+from PluginABC import PluginABC
 import glob
 import re
 
@@ -29,7 +29,7 @@ plugin_files = glob.glob(f"{pluginPath}/*.py")
 plugins = []
 for f in plugin_files:
     p = import_from_path(f, f).Plugin()
-    if not isinstance(p, EmailProcessorProtocol):
+    if not isinstance(p, PluginABC):
         raise Exception(f"fuck your plugin {f}")
     plugins.append(p)
 
@@ -57,14 +57,7 @@ for uid in messages:
 
     handled = False
 
-
-    # TODO: move canHandle into plugin thingy and change it to ABC or whatever
-    def canHandle(p, msg) -> bool:
-        return msg.senderRaw in p.senders
-
-    #results = plugins.filter(p => canHandle(p, msg)
-    #                 .map(p -> p.handle(msg);
-    results = list(map(lambda p: p.handle(msg), [p for p in plugins if canHandle(p, msg)]))
+    results = [p.handle(msg) for p in plugins if p.canHandle(msg)]
     if all(results):
         # archive
         print("ARCHIVE???")
