@@ -1,5 +1,12 @@
 .DEFAULT_GOAL := run
 
+.PHONY: python
+python: .venv ## run python in venv
+	.venv/bin/python
+
+.PHONY: deps
+deps: .venv ## install deps into venv
+
 .venv: requirements.txt
 	python3 -m venv .venv
 	.venv/bin/pip install -r requirements.txt

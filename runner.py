@@ -29,6 +29,8 @@ plugin_files = glob.glob(f"{pluginPath}/*.py")
 plugins = []
 for f in plugin_files:
     p = import_from_path(f, f).Plugin()
+    # TODO: instead of calling Plugin, interate through props till isinstance finds something
+    # that way plugins can be named sanely
     if not isinstance(p, PluginABC):
         raise Exception(f"fuck your plugin {f}")
     plugins.append(p)

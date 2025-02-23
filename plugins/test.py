@@ -1,4 +1,4 @@
-import email
+import email.message
 
 from PluginABC import PluginABC
 
