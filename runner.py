@@ -72,12 +72,10 @@ for uid in messages:
         import traceback
         try:
             result = p.handle(uid, msg)
-        #except Exception as e:
-        except Exception:
+        except Exception as e:
             builtins.print = originalPrint
             print(f"plugin {p} had some issues, marking it failed and continuing")
-            # HOW DOES THIS GET e
-            print(traceback.format_exc())
+            traceback.print_exception(e)
             result = False
         builtins.print = originalPrint
         results.append(result)
