@@ -10,6 +10,8 @@ import importlib.util
 from PluginABC import PluginABC
 import glob
 import re
+import builtins
+from inspect import getmembers, isclass
 
 load_dotenv()
 
@@ -28,12 +30,11 @@ plugin_files = glob.glob(f"{pluginPath}/*.py")
 
 plugins = []
 for f in plugin_files:
-    p = import_from_path(f, f).Plugin()
-    # TODO: instead of calling Plugin, interate through props till isinstance finds something
-    # that way plugins can be named sanely
-    if not isinstance(p, PluginABC):
-        raise Exception(f"fuck your plugin {f}")
-    plugins.append(p)
+    module = import_from_path(f.replace(".py", "").replace("plugins/", "plugins."), f)
+    p = [m[1] for m in getmembers(module, isclass) if m[1] in PluginABC.__subclasses__()]
+    if not p:
+        raise Exception(f"{f} contained no instances of PluginABC")
+    plugins += list(map(lambda foo: foo(), p))
 
 
 server = IMAPClient("imap.gmail.com", use_uid=True)
@@ -50,22 +51,43 @@ for uid in messages:
     msg = email.message_from_bytes(msg_data, policy=email.policy.default)
     simplest = msg.get_body(preferencelist=("plain", "html"))
     content = simplest.get_content()
-    print(f'processing msg[{uid}]: "{msg.get("From")}": "{msg.get("Subject")}"')
 
     # sender might be something like '"Victoria Scott (via Patreon)" <bingo@patreon.com>'
     # we want to filter on the email portion
     msg.senderRaw = re.findall(r'^(?:".*" )?<?(.*?)>?$', (msg.get("X-Google-Original-From") or msg.get("From")))[0]
-    #import ipdb; ipdb.set_trace()
 
     handled = False
 
-    results = [p.handle(msg) for p in plugins if p.canHandle(msg)]
+    pluginsToRun = [p for p in plugins if p.canHandle(uid, msg)]
+
+    printWidth = max([len(str(p)) for p in pluginsToRun])
+    results = []
+    for p in pluginsToRun:
+        originalPrint = print
+        # TODO: logging module
+        def modulePrint(*objs, **kwargs):
+            originalPrint(f"{p:<{printWidth}} > ", *objs, **kwargs)
+        builtins.print = modulePrint
+        result = False
+        import traceback
+        try:
+            result = p.handle(uid, msg)
+        #except Exception as e:
+        except Exception:
+            builtins.print = originalPrint
+            print(f"plugin {p} had some issues, marking it failed and continuing")
+            # HOW DOES THIS GET e
+            print(traceback.format_exc())
+            result = False
+        builtins.print = originalPrint
+        results.append(result)
+
     if all(results):
         # archive
         print("ARCHIVE???")
         # server.delete_messages([uid])
     else:
         print("some plugin failed to process")
+        print("\n".join([f"* {plugins[i]}" for i,v in enumerate(results) if not v]))
 
-    # import ipdb; ipdb.set_trace()
 server.logout()
